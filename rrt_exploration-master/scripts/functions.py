@@ -1,3 +1,4 @@
+#coding:utf-8
 import rospy
 import tf
 from numpy import array
@@ -20,32 +21,35 @@ class robot:
         self.assigned_point = []
         self.name = name
         self.global_frame = rospy.get_param('~global_frame', '/map')
-        self.robot_frame = rospy.get_param('~robot_frame', 'base_link')
+        self.robot_frame = rospy.get_param('~robot_frame', 'base_footprint')   #zhangjiadong
         self.plan_service = rospy.get_param(
-            '~plan_service', '/move_base_node/NavfnROS/make_plan')
+            '~plan_service', '/move_base/GlobalPlanner/make_plan')#/move_base/NavfnROS/make_plan
         self.listener = tf.TransformListener()
         self.listener.waitForTransform(
-            self.global_frame, self.name+'/'+self.robot_frame, rospy.Time(0), rospy.Duration(10.0))
+            self.global_frame, '/'+self.robot_frame, rospy.Time(0), rospy.Duration(10.0))
         cond = 0
         while cond == 0:
             try:
                 rospy.loginfo('Waiting for the robot transform')
+                rospy.loginfo("debug global_frame: %s " % self.global_frame)
+                rospy.loginfo("debug robot_frame : %s " % self.robot_frame)  #zhangjiaodng
                 (trans, rot) = self.listener.lookupTransform(
-                    self.global_frame, self.name+'/'+self.robot_frame, rospy.Time(0))
+                    self.global_frame, '/'+self.robot_frame, rospy.Time(0))
+                rospy.loginfo("debug get tf " )
                 cond = 1
             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                 cond == 0
         self.position = array([trans[0], trans[1]])
         self.assigned_point = self.position
         self.client = actionlib.SimpleActionClient(
-            self.name+'/move_base', MoveBaseAction)
+            '/move_base', MoveBaseAction)
         self.client.wait_for_server()
         robot.goal.target_pose.header.frame_id = self.global_frame
         robot.goal.target_pose.header.stamp = rospy.Time.now()
 
-        rospy.wait_for_service(self.name+self.plan_service)
+        rospy.wait_for_service(self.plan_service)
         self.make_plan = rospy.ServiceProxy(
-            self.name+self.plan_service, GetPlan)
+            self.plan_service, GetPlan)
         robot.start.header.frame_id = self.global_frame
         robot.end.header.frame_id = self.global_frame
 
@@ -54,7 +58,7 @@ class robot:
         while cond == 0:
             try:
                 (trans, rot) = self.listener.lookupTransform(
-                    self.global_frame, self.name+'/'+self.robot_frame, rospy.Time(0))
+                    self.global_frame, '/'+self.robot_frame, rospy.Time(0))
                 cond = 1
             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                 cond == 0
@@ -80,8 +84,8 @@ class robot:
         robot.start.pose.position.y = start[1]
         robot.end.pose.position.x = end[0]
         robot.end.pose.position.y = end[1]
-        start = self.listener.transformPose(self.name+'/map', robot.start)
-        end = self.listener.transformPose(self.name+'/map', robot.end)
+        start = self.listener.transformPose('/map', robot.start)
+        end = self.listener.transformPose('/map', robot.end)
         plan = self.make_plan(start=start, goal=end, tolerance=0.0)
         return plan.plan.poses
 # ________________________________________________________________________________
@@ -120,6 +124,7 @@ def informationGain(mapData, point, r):
             if (i >= 0 and i < limit and i < len(mapData.data)):
                 if(mapData.data[i] == -1 and norm(array(point)-point_of_index(mapData, i)) <= r):
                     infoGain += 1
+    rospy.loginfo('   NBV information: %f',infoGain)
     return infoGain*(mapData.info.resolution**2)
 # ________________________________________________________________________________
 

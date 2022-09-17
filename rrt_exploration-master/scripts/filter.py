@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+#coding:utf-8
 
 # --------Include modules---------------
 from copy import copy
@@ -18,7 +19,8 @@ mapData = OccupancyGrid()
 frontiers = []
 globalmaps = []
 
-
+# (4)将tfLisn和global_frame传到回调函数callBack中，如果存在单个机器人，则global_frame只有一个，也就是base_link
+# 在回调函数中，将变换后的目标点，通过【vstack】存入到frontiers中
 def callBack(data, args):
     global frontiers, min_distance
     transformedPoint = args[0].transformPoint(args[1], data)
@@ -56,14 +58,16 @@ def node():
     threshold = rospy.get_param('~costmap_clearing_threshold', 70)
     # this can be smaller than the laser scanner range, >> smaller >>less computation time>> too small is not good, info gain won't be accurate
     info_radius = rospy.get_param('~info_radius', 1.0)
+# (1)Filter 节点从所有检测器接收检测到的边界点（/detected_points），对这些边界点进行滤波，并将它们传递给 assigner 节点以指令机器人。
+# 过滤包括旧点和无效点的选择，也是冗余点
     goals_topic = rospy.get_param('~goals_topic', '/detected_points')
     n_robots = rospy.get_param('~n_robots', 1)
     namespace = rospy.get_param('~namespace', '')
     namespace_init_count = rospy.get_param('namespace_init_count', 1)
     rateHz = rospy.get_param('~rate', 100)
     global_costmap_topic = rospy.get_param(
-        '~global_costmap_topic', '/move_base_node/global_costmap/costmap')
-    robot_frame = rospy.get_param('~robot_frame', 'base_link')
+        '~global_costmap_topic', '/move_base/global_costmap/costmap')
+    robot_frame = rospy.get_param('~robot_frame', 'base_footprint')
 
     litraIndx = len(namespace)
     rate = rospy.Rate(rateHz)
@@ -72,7 +76,7 @@ def node():
 
 
 # ---------------------------------------------------------------------------------------------------------------
-
+# (2)然后订阅当前move_base发出的costmap
     for i in range(0, n_robots):
         globalmaps.append(OccupancyGrid())
 
@@ -95,15 +99,14 @@ def node():
             pass
 
     global_frame = "/"+mapData.header.frame_id
-
+# (3)将当前goals_topic发出的目标点，从全局坐标系(map)下转换到机器人坐标系(base_link)下：
     tfLisn = tf.TransformListener()
     if len(namespace) > 0:
         for i in range(0, n_robots):
-            tfLisn.waitForTransform(global_frame[1:], namespace+str(
-                i+namespace_init_count)+'/'+robot_frame, rospy.Time(0), rospy.Duration(10.0))
+            tfLisn.waitForTransform('/map', '/'+robot_frame, rospy.Time(0), rospy.Duration(10.0))
     elif len(namespace) == 0:
         tfLisn.waitForTransform(
-            global_frame[1:], '/'+robot_frame, rospy.Time(0), rospy.Duration(10.0))
+            '/map', '/'+robot_frame, rospy.Time(0), rospy.Duration(10.0))
 
     rospy.Subscriber(goals_topic, PointStamped, callback=callBack,
                      callback_args=[tfLisn, global_frame[1:]])
@@ -183,12 +186,15 @@ def node():
 # -------------------------------------------------------------------------
 # ---------------------     Main   Loop     -------------------------------
 # -------------------------------------------------------------------------
+# (5)主循环：Mean-shift：的基本思想：在数据集中选定一个点，然后以这个点为圆心，r为半径，画一个圆(二维下是圆)，求出这个点到所有点的向量的平均值，
+# 而圆心与向量均值的和为新的圆心，然后迭代此过程，直到满足一点的条件结束。
     while not rospy.is_shutdown():
         # -------------------------------------------------------------------------
         # Clustering frontier points
         centroids = []
         front = copy(frontiers)
         if len(front) > 1:
+# （5.1）首先设置半径(或带宽) bandwidth=0.3，通过cluster_centers_计算出的聚类中心的坐标。如果仅存在一个边界点，则它就是聚类中心。
             ms = MeanShift(bandwidth=0.3)
             ms.fit(front)
             centroids = ms.cluster_centers_  # centroids array is the centers of each cluster
@@ -199,7 +205,9 @@ def node():
         frontiers = copy(centroids)
 # -------------------------------------------------------------------------
 # clearing old frontiers
-
+# （5.2？？）清除旧边界点：
+# 边界点都有 occupancy value，即gridValue(globalmaps[i], x)大于阈值threshold的边界点将被视为无效。
+# 占用价值 occupancy value是从costmap中获得的。
         z = 0
         while z < len(centroids):
             cond = False
@@ -218,8 +226,9 @@ def node():
             z += 1
 # -------------------------------------------------------------------------
 # publishing
+# （6）
         arraypoints.points = []
-        for i in centroids:
+        for i in centroids:   #把centroid全部添加到arraypoints中。
             tempPoint.x = i[0]
             tempPoint.y = i[1]
             arraypoints.points.append(copy(tempPoint))
@@ -236,8 +245,8 @@ def node():
             p.y = centroids[q][1]
             pp.append(copy(p))
         points_clust.points = pp
-        pub.publish(points)
-        pub2.publish(points_clust)
+        pub.publish(points)   # 边界
+        pub2.publish(points_clust)   #centriod 中心
         rate.sleep()
 # -------------------------------------------------------------------------
 

@@ -74,15 +74,15 @@ int main(int argc, char **argv)
   std::string ns;
   ns=ros::this_node::getName();
 
-  ros::param::param<float>(ns+"/eta", eta, 0.5);
-  ros::param::param<std::string>(ns+"/map_topic", map_topic, "/robot_1/map"); 
-  ros::param::param<std::string>(ns+"/robot_frame", base_frame_topic, "/robot_1/base_link"); 
+  ros::param::param<float>("/eta", eta, 0.5);
+  ros::param::param<std::string>("/map_topic", map_topic, "/map"); 
+  ros::param::param<std::string>("/robot_frame", base_frame_topic, "/base_footprint"); 
 //---------------------------------------------------------------
 ros::Subscriber sub= nh.subscribe(map_topic, 100 ,mapCallBack);	
 ros::Subscriber rviz_sub= nh.subscribe("/clicked_point", 100 ,rvizCallBack);	
 
 ros::Publisher targetspub = nh.advertise<geometry_msgs::PointStamped>("/detected_points", 10);
-ros::Publisher pub = nh.advertise<visualization_msgs::Marker>(ns+"_shapes", 10);
+ros::Publisher pub = nh.advertise<visualization_msgs::Marker>("/local_detected_shapes", 10);
 
 ros::Rate rate(100); 
  
@@ -93,8 +93,8 @@ while (mapData.header.seq<1 or mapData.data.size()<1)  {  ros::spinOnce();  ros:
 
 
 //visualizations  points and lines..
-points.header.frame_id=mapData.header.frame_id;
-line.header.frame_id=mapData.header.frame_id;
+points.header.frame_id="/map";//mapData.header.frame_id;
+line.header.frame_id="/map";//mapData.header.frame_id;
 points.header.stamp=ros::Time(0);
 line.header.stamp=ros::Time(0);
 	
@@ -116,10 +116,10 @@ line.scale.y= 0.03;
 points.scale.x=0.3; 
 points.scale.y=0.3; 
 
-line.color.r =255.0/255.0;
+line.color.r =255.0/255.0;  //线（local rrt）是红色的
 line.color.g= 0.0/255.0;
 line.color.b =0.0/255.0;
-points.color.r = 255.0/255.0;
+points.color.r = 255.0/255.0; // 点（click point）是红色的
 points.color.g = 0.0/255.0;
 points.color.b = 0.0/255.0;
 points.color.a=0.3;

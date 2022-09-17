@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+#coding:utf-8
 #--------Include modules---------------
 from copy import copy
 import rospy
@@ -25,13 +25,16 @@ global3=OccupancyGrid()
 globalmaps=[]
 def callBack(data):
 	global frontiers
+	# rospy.loginfo("debug get NBV" )
 	frontiers=[]
 	for point in data.points:
 		frontiers.append(array([point.x,point.y]))
 
 def mapCallBack(data):
-    global mapData
-    mapData=data
+	rospy.loginfo("debug get map")
+	global mapData
+	mapData=data
+	# rospy.loginfo("debug get map")
 # Node----------------------------------------------
 
 def node():
@@ -44,6 +47,7 @@ def node():
 	info_multiplier=rospy.get_param('~info_multiplier',3.0)		
 	hysteresis_radius=rospy.get_param('~hysteresis_radius',3.0)			#at least as much as the laser scanner range
 	hysteresis_gain=rospy.get_param('~hysteresis_gain',2.0)				#bigger than 1 (biase robot to continue exploring current region
+	# # 该节点接收目标探测目标，即目标探测目标，即Filter.py节点发布过滤的边界点，并相应地控制机器人
 	frontiers_topic= rospy.get_param('~frontiers_topic','/filtered_points')	
 	n_robots = rospy.get_param('~n_robots',1)
 	namespace = rospy.get_param('~namespace','')
@@ -53,6 +57,7 @@ def node():
 	
 	rate = rospy.Rate(rateHz)
 #-------------------------------------------
+# 接收 地图 和 候选nbv
 	rospy.Subscriber(map_topic, OccupancyGrid, mapCallBack)
 	rospy.Subscriber(frontiers_topic, PointArray, callBack)
 #---------------------------------------------------------------------------------------------------------------
@@ -81,6 +86,7 @@ def node():
 #-------------------------------------------------------------------------			
 #Get information gain for each frontier point
 		infoGain=[]
+	# 计算每一个候选nbv的 信息增益
 		for ip in range(0,len(centroids)):
 			infoGain.append(informationGain(mapData,[centroids[ip][0],centroids[ip][1]],info_radius))
 #-------------------------------------------------------------------------			
@@ -150,11 +156,11 @@ def node():
 #-------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    try:
-        node()
-    except rospy.ROSInterruptException:
-        pass
- 
+    # try:
+    #     node()
+    # except rospy.ROSInterruptException:
+    #     pass
+	node()
  
  
  

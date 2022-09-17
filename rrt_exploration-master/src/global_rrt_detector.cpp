@@ -17,6 +17,7 @@
 #include "visualization_msgs/Marker.h"
 #include <tf/transform_listener.h>
 
+#include <unistd.h>
 
 
 // global variables
@@ -38,9 +39,9 @@ mapData=*msg;
 
 
  
-void rvizCallBack(const geometry_msgs::PointStamped::ConstPtr& msg)
+void rvizCallBack(const geometry_msgs::PointStamped::ConstPtr& msg)   /* zhangjiadong 话题/clicked_point */
 { 
-
+// 前四点是四个定义要探索的正方形区域，最后一个点是树的起点。在发表了关于这个话题的五点后，RRT将开始检测边界
 geometry_msgs::Point p;  
 p.x=msg->point.x;
 p.y=msg->point.y;
@@ -74,14 +75,14 @@ int main(int argc, char **argv)
   std::string ns;
   ns=ros::this_node::getName();
 
-  ros::param::param<float>(ns+"/eta", eta, 0.5);
-  ros::param::param<std::string>(ns+"/map_topic", map_topic, "/robot_1/map"); 
+  ros::param::param<float>("/eta", eta, 0.5);
+  ros::param::param<std::string>("/map_topic", map_topic, "/map"); 
 //---------------------------------------------------------------
 ros::Subscriber sub= nh.subscribe(map_topic, 100 ,mapCallBack);	
 ros::Subscriber rviz_sub= nh.subscribe("/clicked_point", 100 ,rvizCallBack);	
 
-ros::Publisher targetspub = nh.advertise<geometry_msgs::PointStamped>("/detected_points", 10);
-ros::Publisher pub = nh.advertise<visualization_msgs::Marker>(ns+"_shapes", 10);
+ros::Publisher targetspub = nh.advertise<geometry_msgs::PointStamped>("/detected_points", 10);  // “/detected_points”是rrt-tree上， 存在未知区域的point。将作为潜在的探测目标。
+ros::Publisher pub = nh.advertise<visualization_msgs::Marker>("/local_detected_shapes", 10);  //[my]   zhangjiadong ： 将/clicked_point转化为用于可视化的/local_detected_shapes中的五个点，决定了探测的范围、
 
 ros::Rate rate(100); 
  
@@ -115,10 +116,10 @@ line.scale.y= 0.03;
 points.scale.x=0.3; 
 points.scale.y=0.3; 
 
-line.color.r =9.0/255.0;
+line.color.r =9.0/255.0;   //线（global rrt）是蓝色的
 line.color.g= 91.0/255.0;
 line.color.b =236.0/255.0;
-points.color.r = 255.0/255.0;
+points.color.r = 255.0/255.0;  //点（click point）是红色的
 points.color.g = 0.0/255.0;
 points.color.b = 0.0/255.0;
 points.color.a=1.0;
@@ -129,16 +130,17 @@ line.lifetime = ros::Duration();
 geometry_msgs::Point p;  
 
 
-while(points.points.size()<5)
+while(points.points.size()<5)     /* zhangjiadong 话题/clicked_point 。RRT中设置至少添加5个点，才会运行*/
 {
 ros::spinOnce();
 
-pub.publish(points) ;
+pub.publish(points) ;  //说明，接收到小于五个point时，才发送出去。第六个就无效了。
+ROS_INFO("Get the [%d]th clicked_point", points.points.size());
 }
 
 
 
-
+// 以下代码用来计算RRT的初始点
 std::vector<float> temp1;
 temp1.push_back(points.points[0].x);
 temp1.push_back(points.points[0].y);
@@ -186,71 +188,74 @@ pub.publish(points) ;
 std::vector<float> frontiers;
 int i=0;
 float xr,yr;
+//最重要的循环过程： 随机采样点,最近的顶点,新的子节点
 std::vector<float> x_rand,x_nearest,x_new;
 
 
 // Main loop
 while (ros::ok()){
 
-
-// Sample free
-x_rand.clear();
-xr=(drand()*init_map_x)-(init_map_x*0.5)+Xstartx;
-yr=(drand()*init_map_y)-(init_map_y*0.5)+Xstarty;
-
-
-x_rand.push_back( xr ); x_rand.push_back( yr );
+		// Sample free 参数控制用于检测边界点的RRT的增长率，单位为米。分别生成随机点，在树上找到与xr最近的节点xnearest，以及再根据eta产生一个新的随机点。
+		x_rand.clear();
+		xr=(drand()*init_map_x)-(init_map_x*0.5)+Xstartx;
+		yr=(drand()*init_map_y)-(init_map_y*0.5)+Xstarty;
 
 
-// Nearest
-x_nearest=Nearest(V,x_rand);
-
-// Steer
-
-x_new=Steer(x_nearest,x_rand,eta);
+		x_rand.push_back( xr ); x_rand.push_back( yr );
 
 
-// ObstacleFree    1:free     -1:unkown (frontier region)      0:obstacle
-char   checking=ObstacleFree(x_nearest,x_new,mapData);
+		// Nearest
+		x_nearest=Nearest(V,x_rand);
 
-	  if (checking==-1){
-          	exploration_goal.header.stamp=ros::Time(0);
-          	exploration_goal.header.frame_id=mapData.header.frame_id;
-          	exploration_goal.point.x=x_new[0];
-          	exploration_goal.point.y=x_new[1];
-          	exploration_goal.point.z=0.0;
-          	p.x=x_new[0]; 
-			p.y=x_new[1]; 
-			p.z=0.0;
-          	points.points.push_back(p);
-          	pub.publish(points) ;
-          	targetspub.publish(exploration_goal);
-		  	points.points.clear();
-        	
-        	}
-	  	
-	  
-	  else if (checking==1){
-	 	V.push_back(x_new);
-	 	
-	 	p.x=x_new[0]; 
-		p.y=x_new[1]; 
-		p.z=0.0;
-	 	line.points.push_back(p);
-	 	p.x=x_nearest[0]; 
-		p.y=x_nearest[1]; 
-		p.z=0.0;
-	 	line.points.push_back(p);
+		// Steer
 
-	        }
+		x_new=Steer(x_nearest,x_rand,eta);
 
 
+		// 接下来，计算新产生的随机点与最临近点之间的障碍物： ObstacleFree    1:free     -1:unkown (frontier region)      0:obstacle
+		char   checking=ObstacleFree(x_nearest,x_new,mapData);
 
-pub.publish(line);  
+			if (checking==-1){
+				// 如果当前点与最临近点之间未建图，即未知的情况下，通过发布exploration_goal目标点，探索位置区域。
+					exploration_goal.header.stamp=ros::Time(0);
+					exploration_goal.header.frame_id=mapData.header.frame_id;
+					exploration_goal.point.x=x_new[0];
+					exploration_goal.point.y=x_new[1];
+					exploration_goal.point.z=0.0;
+					p.x=x_new[0]; 
+					p.y=x_new[1]; 
+					p.z=0.0;
+					points.points.push_back(p);
+					pub.publish(points) ;
+					targetspub.publish(exploration_goal);  //这咋办？？
+					points.points.clear();
+					
+					}
+				
+				//   如果未检测到障碍物的话，则直接连成线。
+			else if (checking==1){
+				V.push_back(x_new);
+				
+				p.x=x_new[0]; 
+				p.y=x_new[1]; 
+				p.z=0.0;
+				line.points.push_back(p);
+				p.x=x_nearest[0]; 
+				p.y=x_nearest[1]; 
+				p.z=0.0;
+				line.points.push_back(p);
+
+					}
 
 
-   
 
-ros::spinOnce();
-rate.sleep();
-  }return 0;}
+		pub.publish(line);  //line的颜色
+
+
+		
+
+		ros::spinOnce();
+		rate.sleep();
+	}
+  return 0;
+}

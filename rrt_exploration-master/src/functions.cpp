@@ -43,7 +43,7 @@ return V[min_index];
 
 
 
-//Steer function
+//Steer function 用于判断紧邻点是否满足步长条件，并确定新的根节点
 std::vector<float> Steer(  std::vector<float> x_nearest , std::vector<float> x_rand, float eta){
 std::vector<float> x_new;
 

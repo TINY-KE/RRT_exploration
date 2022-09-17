@@ -65,12 +65,12 @@ All robot's frames should be prefixed by its name. Naming of robots starts from 
 ![alt text](https://github.com/hasauino/storage/blob/master/pictures/framesTf.png "robot_1 frames")
 
 ### 3.3. Robot's node and topic names
-All the nodes and topics running on a robot must also be prefixed by its name. For robot 1, node names should look like: ```/robot_1/move_base_node```,  ```/robot_1/slam_gmapping```.
+All the nodes and topics running on a robot must also be prefixed by its name. For robot 1, node names should look like: ```/robot_1/move_base```,  ```/robot_1/slam_gmapping```.
 
 And topic names should be like: ```/robot_1/odom```,  ```/robot_1/map```,  ```/robot_1/base_scan```, ..etc.
 
 ### 3.4. Setting up the navigation stack on the robots
-The ```move_base_node``` node, which brings up the navigation stack on the robot, must be running. This package (rrt_exploration) generates target exploration goals, each robot must be able to receive these points and move towards them. This is why the navigation stack is needed. Additionally, each robot must have a global and local cost maps. All of these are proivded from the ```move_base_node```. 
+The ```move_base``` node, which brings up the navigation stack on the robot, must be running. This package (rrt_exploration) generates target exploration goals, each robot must be able to receive these points and move towards them. This is why the navigation stack is needed. Additionally, each robot must have a global and local cost maps. All of these are proivded from the ```move_base```. 
 
 ### 3.5. A mapping node
 Each robot should have a local map generated from the [gmapping](http://wiki.ros.org/gmapping) package.
@@ -156,11 +156,11 @@ The filter nodes receives the detected frontier points from all the detectors, f
 #### 4.4.2. Subscribed Topics
  - The map (Topic name is defined by the ```~map_topic``` parameter) ([nav_msgs/OccupancyGrid](http://docs.ros.org/api/nav_msgs/html/msg/OccupancyGrid.html)).
 
-- ```robot_x/move_base_node/global_costmap/costmap``` ([nav_msgs/OccupancyGrid](http://docs.ros.org/api/nav_msgs/html/msg/OccupancyGrid.html)): where x (in robot_x) refers to robot's number. 
+- ```robot_x/move_base/global_costmap/costmap``` ([nav_msgs/OccupancyGrid](http://docs.ros.org/api/nav_msgs/html/msg/OccupancyGrid.html)): where x (in robot_x) refers to robot's number. 
 
 The filter node subscribes for all the costmap topics of all the robots, the costmap is required therefore. Normally, costmaps should be published by the navigation stack (after bringing up the navigation stack on the robots, each robot will have a costmap).
 For example, if  ```n_robots=2```, the node will subscribe to:
-```robot_1/move_base_node/global_costmap/costmap``` and ```robot_2/move_base_node/global_costmap/costmap```.
+```robot_1/move_base/global_costmap/costmap``` and ```robot_2/move_base/global_costmap/costmap```.
 The costmaps are used to delete invalid points.
 
 Note: Namespaces of all the nodes corresponding to a robot should start with ```robot_x```. Again ```x``` is the robot number. 
@@ -176,7 +176,7 @@ Note: Namespaces of all the nodes corresponding to a robot should start with ```
  - ```filtered_points``` ([PointArray](https://github.com/hasauino/rrt_exploration/blob/master/msg/PointArray.msg)): All the filtered points are sent as an array of points to the assigner node on this topic.
 
 ### 4.5. Assigner
-This node recieve target exploration goals, which are the filtered frontier points published by the filter node, and commands the robots accordingly. The assigner node commands the robots through the ```move_base_node```. This is why you have bring up the navigation stack on your robots.
+This node recieve target exploration goals, which are the filtered frontier points published by the filter node, and commands the robots accordingly. The assigner node commands the robots through the ```move_base```. This is why you have bring up the navigation stack on your robots.
 
 #### 4.5.1. Parameters
 - ```~map_topic``` (string, default: "/robot_1/map"): This parameter defines the topic name on which the node will recieve the map. In the single robot case, this topic should be set to the map topic of the robot. In the multi-robot case, this topic must be set to global merged map.
@@ -202,7 +202,7 @@ This node recieve target exploration goals, which are the filtered frontier poin
 - Filtered frontier points topic (Topic name is defined by the ```~frontiers_topic``` parameter)  ([PointArray](https://github.com/hasauino/rrt_exploration/blob/master/msg/PointArray.msg)).
 
 #### 4.5.3. Published Topics
-The assigner node does not publish anything. It sends the assinged point to the ```move_base_node``` using Actionlib (the assigner node is an actionlib client to the move_base_node actionlib server).
+The assigner node does not publish anything. It sends the assinged point to the ```move_base``` using Actionlib (the assigner node is an actionlib client to the move_base actionlib server).
 
 
 

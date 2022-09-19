@@ -34,7 +34,7 @@ def mapCallBack(data):
 	rospy.loginfo("debug get map")
 	global mapData
 	mapData=data
-	# rospy.loginfo("debug get map")
+
 # Node----------------------------------------------
 
 def node():

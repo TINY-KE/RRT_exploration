@@ -35,6 +35,7 @@ rdm r; // for genrating random numbers
 void mapCallBack(const nav_msgs::OccupancyGrid::ConstPtr& msg)
 {
 mapData=*msg;
+ROS_INFO("global: Get the map");
 }
 
 
@@ -48,7 +49,7 @@ p.y=msg->point.y;
 p.z=msg->point.z;
 
 points.points.push_back(p);
-
+ROS_INFO("Get the [%d]th clicked_point -- callback", points.points.size());
 }
 
 
@@ -87,9 +88,13 @@ ros::Publisher pub = nh.advertise<visualization_msgs::Marker>("/local_detected_s
 ros::Rate rate(100); 
  
  
+// TODO: [zhangjiadong] 这什么鬼啊？？？　　为什么mapData明明有了数据，但却data.size为０
 // wait until map is received, when a map is received, mapData.header.seq will not be < 1  
-while (mapData.header.seq<1 or mapData.data.size()<1)  {  ros::spinOnce();  ros::Duration(0.1).sleep();}
-
+// while (mapData.header.seq<1 or mapData.data.size()<1)  {  
+// 	ros::spinOnce();  ros::Duration(0.1).sleep();
+// 	ROS_INFO("global: wait until map is received, %f,  %f", mapData.header.seq, mapData.data.size());
+// 	std::cout<<"map_topic:"<<map_topic<<std::endl;
+// }
 
 
 //visualizations  points and lines..
@@ -132,10 +137,10 @@ geometry_msgs::Point p;
 
 while(points.points.size()<5)     /* zhangjiadong 话题/clicked_point 。RRT中设置至少添加5个点，才会运行*/
 {
-ros::spinOnce();
-
-pub.publish(points) ;  //说明，接收到小于五个point时，才发送出去。第六个就无效了。
-ROS_INFO("Get the [%d]th clicked_point", points.points.size());
+	ros::spinOnce();
+	pub.publish(points) ;  //说明，接收到小于五个point时，才发送出去。第六个就无效了。
+	ROS_INFO("Get the [%d]th clicked_point", points.points.size());
+	// std::cout<<"Get the "<<points.points.size()<<"th clicked_point"<<std::endl;
 }
 
 
